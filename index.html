@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncUp</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* CRITICAL WIX FIX: Ensure the body and HTML take up the full space of the iFrame */
+        html, body {
+            margin: 0;
+            padding: 0;
+            /* New: Simple White Background */
+            background-color: #ffffff; 
+            min-height: 1200px; /* Aggressively force vertical space for visibility */
+            width: 100%;
+        }
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* gray-600 for contrast */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #1f2937; /* gray-800 */
+        }
+    </style>
+</head>
+<body class="bg-white font-sans p-0 m-0">
+    <div id="app-root" class="min-h-[1200px] flex flex-col items-center">
+        <!-- Application will render here -->
+    </div>
+
+    <script type="module">
+        // --- GLOBAL STATE & MOCK DATA ---
+        window.appState = {
+            userId: "mock-user-" + Math.floor(Math.random() * 10000), 
+            activePage: 'Home', 
+            lostItems: [], 
+            foundItems: [], 
+            syncRequests: [], 
+            message: null,
+            socialSyncTab: 'Gym' 
+        };
+
+        const SPORTS_OPTIONS = [
+            'Swimming', 'Basketball', 'Football', 'Handball', 'Badminton',
+            'Squash', 'Table Tennis', 'Tennis', 'Snooker', 'Carrom', 'Chess'
+        ];
+
+        // --- UTILITY FUNCTIONS ---
+
+        /** Shows a temporary success message banner. */
+        function showMessage(text, isError = false) {
+            window.appState.message = { text, isError };
+            renderApp();
+            setTimeout(() => {
+                window.appState.message = null;
+                renderApp();
+            }, 3000);
+        }
+
+        /** Formats a timestamp into a readable date and time string. */
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            return `${dateStr} at ${timeStr}`;
+        }
+
+        // --- NAVIGATION & RENDERING COMPONENTS ---
+
+        function getHeaderHtml() {
+            const pages = ['Home', 'Lost & Found', 'Social Sync'];
+            return `
+                <!-- New: Dark Grey Header for Formal Look -->
+                <div class="w-full bg-gray-800 text-white shadow-md sticky top-0 z-10 border-b border-gray-700">
+                    <div class="max-w-6xl mx-auto p-4 flex justify-between items-center">
+                        <h1 class="text-3xl font-serif font-bold tracking-widest text-white">SYNCUP</h1>
+                        <div id="user-id-display" class="text-xs bg-gray-700 px-3 py-1 rounded-sm opacity-75">
+                            User ID: ${window.appState.userId.substring(0, 15)}...
+                        </div>
+                    </div>
+                    <nav class="max-w-6xl mx-auto flex justify-center">
+                        ${pages.map(page => `
+                            <button data-page="${page}" 
+                                class="page-button px-6 py-3 text-center text-lg font-medium transition-all duration-300 
+                                ${window.appState.activePage === page ? 'border-b-4 border-slate-300 text-slate-300 bg-gray-700' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}"
+                            >
+                                ${page}
+                            </button>
+                        `).join('')}
+                    </nav>
+                </div>
+            `;
+        }
+        
+        // --- HOME PAGE RENDERING ---
+
+        function renderHomePage() {
+            return `
+                <div class="w-full max-w-6xl p-6 space-y-12">
+                    <!-- Hero Image -->
+                    <div class="rounded-lg overflow-hidden border border-gray-300">
+                        <img src="https://placehold.co/1200x200/1F2937/ffffff?text=SyncUp+Student+Services" 
+                             onerror="this.onerror=null; this.src='https://placehold.co/1200x200/1F2937/ffffff?text=SyncUp+Student+Services';" 
+                             alt="SyncUp Banner" class="w-full h-auto object-cover">
+                    </div>
+
+                    <h2 class="text-3xl font-bold text-gray-800 text-center border-b pb-2">Centralized Campus Connection</h2>
+                    
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Lost & Found Intro Card -->
+                        <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 border-t-4 border-red-800 hover:shadow-md transition duration-300">
+                            <h3 class="text-xl font-semibold text-red-800 mb-3 border-b pb-1">Lost & Found Service</h3>
+                            <p class="text-gray-600 mb-6">A straightforward channel for reporting lost possessions and listing found items. Our system facilitates quick, verified contact exchange for efficient item recovery.</p>
+                            <img src="https://placehold.co/600x250/B91C1C/ffffff?text=Lost+Assets" alt="Lost and Found" class="w-full h-32 object-cover rounded-md mb-4 border border-gray-200">
+                            <button data-page="Lost & Found" class="page-button w-full py-2 px-4 rounded-sm shadow-sm text-white font-medium bg-gray-700 hover:bg-gray-800 transition duration-150">
+                                Access Lost & Found
+                            </button>
+                        </div>
+                        
+                        <!-- Social Sync Intro Card -->
+                        <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 border-t-4 border-slate-700 hover:shadow-md transition duration-300">
+                            <h3 class="text-xl font-semibold text-slate-700 mb-3 border-b pb-1">Social Sync Coordination</h3>
+                            <p class="text-gray-600 mb-6">Coordinate specific meetups for athletic, fitness, or academic purposes. Post your time and location to instantly find a reliable partner or group.</p>
+                            <img src="https://placehold.co/600x250/475569/ffffff?text=Social+Coordination" alt="Social Sync" class="w-full h-32 object-cover rounded-md mb-4 border border-gray-200">
+                            <button data-page="Social Sync" class="page-button w-full py-2 px-4 rounded-sm shadow-sm text-white font-medium bg-slate-700 hover:bg-slate-800 transition duration-150">
+                                Access Social Sync
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        function getFooterHtml() {
+            return `
+                <div class="w-full bg-gray-100 mt-8 py-4 text-center text-gray-600 text-sm border-t border-gray-300">
+                    &copy; ${new Date().getFullYear()} SyncUp. All data shown is mock data.
+                </div>
+            `;
+        }
+
+        function renderMessage() {
+            if (!window.appState.message) return '';
+            const { text, isError } = window.appState.message;
+            // Use formal dark teal for success messages
+            const bgColor = isError ? 'bg-red-700' : 'bg-teal-700'; 
+            return `
+                <div class="fixed top-0 left-1/2 transform -translate-x-1/2 mt-4 p-4 rounded-md shadow-xl text-white font-semibold z-50 transition-opacity duration-500 ${bgColor}">
+                    ${text}
+                </div>
+            `;
+        }
+
+        // --- LOST & FOUND RENDERING ---
+
+        function renderLostAndFound() {
+            return `
+                <div class="w-full max-w-6xl p-6 space-y-8">
+                    <img src="https://placehold.co/1200x150/1F2937/ffffff?text=LOST+%26+FOUND+DIRECTORY" alt="Lost and Found Header" class="w-full rounded-md shadow-sm mb-4 border border-gray-300">
+                    <h2 class="text-3xl font-bold text-gray-800 border-b pb-2 border-red-800">Lost & Found Center</h2>
+
+                    <!-- Posting Forms -->
+                    <div class="grid md:grid-cols-2 gap-6">
+                        ${renderLostItemForm()}
+                        ${renderFoundItemForm()}
+                    </div>
+
+                    <!-- Listings -->
+                    ${renderLostAndFoundListings()}
+                </div>
+            `;
+        }
+
+        function renderLostItemForm() {
+            return `
+                <div class="bg-white p-6 rounded-md shadow-sm border border-gray-200 border-t-4 border-red-800">
+                    <h3 class="text-xl font-semibold mb-4 text-red-800">Report Lost Item</h3>
+                    <form id="lost-item-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Item Name</label>
+                            <input type="text" id="lost-item-name" required class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-red-800 focus:ring-red-800">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Description / Last Seen</label>
+                            <textarea id="lost-item-desc" required rows="3" class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-red-800 focus:ring-red-800"></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-sm shadow-sm text-white font-medium bg-red-800 hover:bg-red-900 transition duration-150">
+                            Post Lost Item
+                        </button>
+                    </form>
+                </div>
+            `;
+        }
+
+        function renderFoundItemForm() {
+            return `
+                <div class="bg-white p-6 rounded-md shadow-sm border border-gray-200 border-t-4 border-green-800">
+                    <h3 class="text-xl font-semibold mb-4 text-green-800">List Found Item</h3>
+                    <form id="found-item-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Item Name</label>
+                            <input type="text" id="found-item-name" required class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-green-800 focus:ring-green-800">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Location Found</label>
+                            <textarea id="found-item-desc" required rows="3" class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-green-800 focus:ring-green-800"></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-sm shadow-sm text-white font-medium bg-green-800 hover:bg-green-900 transition duration-150">
+                            Post Found Item
+                        </button>
+                    </form>
+                </div>
+            `;
+        }
+
+        function renderLostAndFoundListings() {
+            // Sort by latest post first
+            const allItems = [...window.appState.lostItems, ...window.appState.foundItems].sort((a, b) => b.id - a.id);
+
+            return `
+                <div class="space-y-6">
+                    <h3 class="text-2xl font-bold text-gray-800 pt-4 border-b border-gray-200 pb-2">Community Listings (${allItems.length} Active)</h3>
+                    <div class="space-y-4">
+                        ${allItems.length === 0 ? '<p class="text-gray-500 text-center py-8 bg-gray-50 rounded-md shadow-inner border border-gray-200">No active listings right now. Be the first to post!</p>' : allItems.map(item => {
+                            const isLost = item.type === 'Lost';
+                            const borderColor = isLost ? 'border-red-800' : 'border-green-800';
+                            const titleColor = isLost ? 'text-red-800' : 'text-green-800';
+                            const buttonColor = isLost ? 'bg-gray-700 hover:bg-gray-900' : 'bg-slate-700 hover:bg-slate-800';
+                            const buttonText = isLost ? 'I Found This Item!' : 'I Lost This Item!';
+                            const timestamp = formatTimestamp(item.timestamp);
+
+                            return `
+                                <div class="bg-white p-4 rounded-md shadow-sm border border-gray-200 border-l-4 ${borderColor} flex justify-between items-center transition duration-200 hover:shadow-md">
+                                    <div>
+                                        <div class="font-semibold text-base ${titleColor}">${item.type} | ${item.item}</div>
+                                        <p class="text-gray-600 text-sm">${item.description}</p>
+                                        <p class="text-xs text-gray-500 mt-1">Posted: ${timestamp}</p>
+                                        <span class="text-xs font-medium ${item.status === 'Matched' ? 'text-teal-700' : 'text-gray-500'}">
+                                            Status: ${item.status}
+                                        </span>
+                                        ${item.status === 'Matched' ? `<p class="mt-1 text-sm font-bold text-gray-800">Contact: ${item.contact}</p>` : ''}
+                                    </div>
+                                    ${item.status === 'Active' ? `
+                                        <button data-id="${item.id}" data-type="${item.type}" class="match-item-btn py-2 px-4 rounded-sm text-white font-medium text-sm ${buttonColor} transition duration-150">
+                                            ${buttonText}
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- SOCIAL SYNC RENDERING ---
+
+        function renderSocialSync() {
+            const categories = ['Gym', 'Sports', 'Study'];
+
+            return `
+                <div class="w-full max-w-6xl p-6 space-y-8">
+                    <img src="https://placehold.co/1200x150/475569/ffffff?text=SOCIAL+SYNC+COORDINATION" alt="Social Sync Header" class="w-full rounded-md shadow-sm mb-4 border border-gray-300">
+                    <h2 class="text-3xl font-bold text-gray-800 border-b pb-2 border-slate-700">Social Sync Matchmaker</h2>
+                    
+                    <!-- Internal Tabs for Social Sync -->
+                    <div class="flex border-b border-gray-200">
+                        ${categories.map(cat => `
+                            <button data-sync-tab="${cat}" 
+                                class="sync-tab-button px-4 py-2 text-center text-lg font-medium transition-all duration-300 
+                                ${window.appState.socialSyncTab === cat ? 'border-b-4 border-slate-700 text-slate-700 font-semibold' : 'text-gray-500 hover:text-slate-700'}"
+                            >
+                                ${cat}
+                            </button>
+                        `).join('')}
+                    </div>
+                    
+                    <div id="social-sync-content">
+                        ${renderSyncPostForm(categories)}
+                        ${renderSyncListings(window.appState.socialSyncTab)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSyncPostForm(categories) {
+            return `
+                <div class="bg-white p-6 rounded-md shadow-sm border border-gray-200 border-t-4 border-slate-700 mt-6">
+                    <h3 class="text-xl font-semibold mb-4 text-slate-700">Post a Sync-Up Request</h3>
+                    <form id="sync-post-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Category</label>
+                            <select id="sync-category" required class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-slate-700 focus:ring-slate-700">
+                                <option value="">Select Category</option>
+                                ${categories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div id="sport-select-container" class="hidden">
+                            <label class="block text-sm font-medium text-gray-700">Select Sport</label>
+                            <select id="sync-sport" class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-slate-700 focus:ring-slate-700">
+                                ${SPORTS_OPTIONS.map(sport => `<option value="${sport}">${sport}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Time / Location</label>
+                            <input type="text" id="sync-time" placeholder="e.g., 6 PM at Rec Center" required class="mt-1 block w-full rounded-sm border-gray-300 shadow-sm p-2 border focus:border-slate-700 focus:ring-slate-700">
+                        </div>
+                        <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-sm shadow-sm text-white font-medium bg-slate-700 hover:bg-slate-800 transition duration-150">
+                            Post Sync Request
+                        </button>
+                    </form>
+                </div>
+            `;
+        }
+
+        function renderSyncListings(activeCategory) {
+            const categoryRequests = window.appState.syncRequests.filter(req => req.category === activeCategory && req.status === 'Active');
+            
+            const cardColor = 'bg-white';
+            const titleColor = 'text-gray-800';
+
+            return `
+                <div class="mt-6 space-y-4">
+                    <h3 class="text-2xl font-bold text-gray-800">Active ${activeCategory} Requests</h3>
+                    <div class="bg-gray-50 p-4 rounded-md shadow-inner border border-gray-200">
+                        <div class="space-y-3 max-h-96 overflow-y-auto p-2">
+                            ${categoryRequests.length === 0 ? `<p class="text-gray-500 text-sm py-4 text-center">No active requests for ${activeCategory} right now. Post one above!</p>` : categoryRequests.map(req => {
+                                const timestamp = formatTimestamp(req.timestamp); 
+                                const categoryAccent = req.category === 'Gym' ? 'border-blue-700' : req.category === 'Sports' ? 'border-orange-700' : 'border-purple-700';
+
+                                return `
+                                <div class="bg-white p-3 rounded-md shadow-sm border border-gray-300 border-l-4 ${categoryAccent}">
+                                    <div class="font-semibold text-gray-800">${req.time}</div>
+                                    <p class="text-xs text-gray-600 mt-1">${req.details}</p>
+                                    ${req.sport ? `<span class="text-xs font-medium text-slate-700">Activity: ${req.sport}</span>` : ''}
+                                    <p class="text-xs text-gray-500 mt-1">Posted: ${timestamp}</p>
+                                    <button data-id="${req.id}" data-category="${req.category}" class="join-sync-btn mt-2 w-full py-1 px-3 text-sm rounded-sm text-white font-medium bg-gray-700 hover:bg-gray-800 transition duration-150">
+                                        Join Session
+                                    </button>
+                                </div>
+                            `;
+                            }).join('')}
+                             ${window.appState.syncRequests.filter(req => req.category === activeCategory && req.status === 'Matched').map(req => `
+                                <div class="bg-gray-100 p-3 rounded-md shadow-sm border border-green-700 border-l-2 opacity-80">
+                                    <div class="font-semibold text-gray-700">${req.time} - Matched!</div>
+                                    <p class="text-xs text-gray-600 mt-1">Contact: ${req.contact}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- MAIN RENDER LOOP ---
+
+        /** The main function to render the entire application UI based on state */
+        function renderApp() {
+            const appRoot = document.getElementById('app-root');
+            let mainContent = '';
+
+            switch (window.appState.activePage) {
+                case 'Home':
+                    mainContent = renderHomePage();
+                    break;
+                case 'Lost & Found':
+                    mainContent = renderLostAndFound();
+                    break;
+                case 'Social Sync':
+                    mainContent = renderSocialSync();
+                    break;
+                default:
+                    mainContent = renderHomePage();
+            }
+
+            // 1. Render the main structure
+            appRoot.innerHTML = `
+                ${renderMessage()}
+                ${getHeaderHtml()}
+                <main class="w-full mx-auto py-8 bg-gray-100">
+                    <div id="app-container" class="flex justify-center">
+                        ${mainContent}
+                    </div>
+                </main>
+                ${getFooterHtml()}
+            `;
+
+            // 2. Attach all listeners after rendering
+            attachHeaderListeners();
+            if (window.appState.activePage === 'Lost & Found') {
+                attachLostAndFoundListeners();
+            } else if (window.appState.activePage === 'Social Sync') {
+                attachSocialSyncListeners();
+            }
+        }
+
+        // --- LISTENER ATTACHMENT ---
+
+        function attachHeaderListeners() {
+            document.querySelectorAll('.page-button').forEach(button => {
+                button.onclick = (e) => {
+                    const newPage = e.currentTarget.dataset.page;
+                    if (window.appState.activePage !== newPage) {
+                        window.appState.activePage = newPage;
+                        renderApp();
+                    }
+                };
+            });
+        }
+        
+        function attachSocialSyncListeners() {
+             // Attach listeners for the internal Social Sync tabs
+            document.querySelectorAll('.sync-tab-button').forEach(button => {
+                button.onclick = (e) => {
+                    const newSyncTab = e.currentTarget.dataset.syncTab;
+                    if (window.appState.socialSyncTab !== newSyncTab) {
+                        window.appState.socialSyncTab = newSyncTab;
+                        renderApp(); // Re-render to show new category content
+                    }
+                };
+            });
+
+            const syncForm = document.getElementById('sync-post-form');
+            const categorySelect = document.getElementById('sync-category');
+            const sportSelectContainer = document.getElementById('sport-select-container');
+
+            if (categorySelect) {
+                categorySelect.onchange = () => {
+                    if (categorySelect.value === 'Sports') {
+                        sportSelectContainer.classList.remove('hidden');
+                    } else {
+                        sportSelectContainer.classList.add('hidden');
+                    }
+                };
+            }
+
+            if (syncForm) {
+                syncForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    const category = categorySelect.value;
+                    const sport = category === 'Sports' ? document.getElementById('sync-sport').value : null;
+                    const time = document.getElementById('sync-time').value;
+                    handlePostSyncRequest(category, sport, time);
+                };
+            }
+
+            document.querySelectorAll('.join-sync-btn').forEach(button => {
+                button.onclick = (e) => {
+                    const id = parseInt(e.currentTarget.dataset.id);
+                    const category = e.currentTarget.dataset.category;
+                    handleJoinSyncRequest(id, category);
+                };
+            });
+        }
+        
+        // --- LOST AND FOUND LISTENERS (Same as before) ---
+        function attachLostAndFoundListeners() {
+            const lostForm = document.getElementById('lost-item-form');
+            if (lostForm) {
+                lostForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    const name = document.getElementById('lost-item-name').value;
+                    const desc = document.getElementById('lost-item-desc').value;
+                    handlePostLostItem(name, desc);
+                };
+            }
+
+            const foundForm = document.getElementById('found-item-form');
+            if (foundForm) {
+                foundForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    const name = document.getElementById('found-item-name').value;
+                    const desc = document.getElementById('found-item-desc').value;
+                    handlePostFoundItem(name, desc);
+                };
+            }
+
+            document.querySelectorAll('.match-item-btn').forEach(button => {
+                button.onclick = (e) => {
+                    const id = parseInt(e.currentTarget.dataset.id);
+                    const type = e.currentTarget.dataset.type;
+                    handleMatchItem(id, type);
+                };
+            });
+        }
+        
+        // --- HANDLERS (MOCK LOGIC) ---
+        
+        function handlePostLostItem(name, desc) {
+            // Include timestamp in the object
+            const newItem = { id: Date.now(), type: 'Lost', item: name, description: desc, contact: 'MOCKED CONTACT: ' + window.appState.userId, status: 'Active', timestamp: Date.now() };
+            window.appState.lostItems.push(newItem);
+            showMessage(`Lost item "${name}" posted successfully!`);
+            document.getElementById('lost-item-form').reset();
+            renderApp();
+        }
+
+        function handlePostFoundItem(name, desc) {
+            // Include timestamp in the object
+            const newItem = { id: Date.now(), type: 'Found', item: name, description: desc, contact: 'MOCKED CONTACT: ' + window.appState.userId, status: 'Active', timestamp: Date.now() };
+            window.appState.foundItems.push(newItem);
+            showMessage(`Found item "${name}" listed successfully!`);
+            document.getElementById('found-item-form').reset();
+            renderApp();
+        }
+
+        function handleMatchItem(id, type) {
+            const itemArray = type === 'Lost' ? window.appState.lostItems : window.appState.foundItems;
+            const itemIndex = itemArray.findIndex(i => i.id === id);
+
+            if (itemIndex > -1) {
+                itemArray[itemIndex].status = 'Matched';
+                itemArray[itemIndex].contact = `MOCKED CONTACT: User ${window.appState.userId} Matched!`;
+                showMessage(`Match confirmed! Contact details revealed for item "${itemArray[itemIndex].item}".`, false);
+                renderApp();
+            }
+        }
+
+        function handlePostSyncRequest(category, sport, time) {
+            // Setting a simple default description since the field was removed
+            const details = `Looking to sync up for ${category} session. Meeting at: ${time}`; 
+            // Include timestamp in the object
+            const newRequest = { id: Date.now(), category: category, sport: sport, time: time, details: details, user: 'MockUser_Poster', contact: 'MOCKED CONTACT: ' + window.appState.userId, status: 'Active', timestamp: Date.now() };
+            window.appState.syncRequests.push(newRequest);
+            showMessage(`${category} request posted successfully for ${time}!`);
+            document.getElementById('sync-post-form').reset();
+            renderApp();
+        }
+
+        function handleJoinSyncRequest(id, category) {
+            const reqIndex = window.appState.syncRequests.findIndex(r => r.id === id);
+
+            if (reqIndex > -1) {
+                window.appState.syncRequests[reqIndex].status = 'Matched';
+                window.appState.syncRequests[reqIndex].contact = `MOCKED CONTACT: User ${window.appState.userId} Joined!`;
+                showMessage(`You joined the ${category} session! Contact details revealed.`);
+                renderApp();
+            }
+        }
+
+        // --- INITIALIZATION ---
+        window.initApp = function() {
+            renderApp();
+        };
+
+        // Start the application immediately when the DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+             window.initApp();
+        });
+
+    </script>
+</body>
+</html>
